@@ -1,0 +1,83 @@
+﻿@import "tailwindcss";
+
+:root {
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  color: #17181c;
+  background: #f8fafc;
+
+  --ink: #17181c;
+  --ink-2: #34353c;
+  --paper: #f8fafc;
+  --surface: #ffffff;
+  --surface-2: #f1f5f9;
+  --line: #e2e8f0;
+  --line-strong: #cbd5e1;
+  --muted: #64748b;
+  --muted-2: #94a3b8;
+
+  --signal: #2563eb;
+  --signal-strong: #1d4ed8;
+  --signal-tint: #dbeafe;
+
+  --positive: #157567;
+  --positive-tint: #e2f1ee;
+  --negative: #bf462e;
+  --negative-tint: #f7e6e1;
+
+  --radius: 14px;
+  --radius-sm: 10px;
+  --radius-lg: 22px;
+
+  --font-display: Inter, system-ui, sans-serif;
+  --font-body: Inter, system-ui, sans-serif;
+  --font-mono: "SFMono-Regular", Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  min-height: 100%;
+  scroll-behavior: smooth;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: 3px;
+}
+
+::selection {
+  background: var(--signal-tint);
+  color: var(--ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
