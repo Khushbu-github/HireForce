@@ -20,7 +20,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     _detector = None
 
 
-app = FastAPI(title="InterXAI Vision", lifespan=lifespan)
+app = FastAPI(title="HireForce Vision", lifespan=lifespan)
 
 
 async def require_secret(x_vision_secret: str | None = Header(default=None)) -> None:
