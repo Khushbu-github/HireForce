@@ -31,6 +31,15 @@ curl -s localhost:8001/detect \
 `face_count` is the **max** across the submitted frames — conservative: a second
 person in any frame trips it. Unknown `checks` values return HTTP 400.
 
+## Tests
+
+```bash
+uv sync --group dev
+uv run pytest
+```
+
+API tests use a fake detector so they do not download model weights.
+
 ## Smoke check
 
 From the repo root (with the vision server already running on port 8001):
