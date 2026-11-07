@@ -1,7 +1,7 @@
 [project]
-name = "interxai-vision"
+name = "hireforce-vision"
 version = "0.1.0"
-description = "InterXAI proctoring vision service — stateless face/hand/pose inference over HTTP."
+description = "HireForce proctoring vision service — stateless face/hand/pose inference over HTTP."
 readme = "README.md"
 # MediaPipe wheels lag new CPython; pin to 3.12 so resolution can't pick a
 # Python it has no wheel for.

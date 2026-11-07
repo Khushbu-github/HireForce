@@ -1,4 +1,4 @@
-# Ruff configuration for the InterXAI vision service.
+# Ruff configuration for the HireForce vision service.
 
 target-version = "py312"
 line-length = 100

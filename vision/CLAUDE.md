@@ -2,7 +2,7 @@
 
 ## What this is
 
-A **standalone, stateless proctoring vision service** for InterXAI. It runs face/hand/pose inference over HTTP and nothing else: no database, no auth of its own beyond a shared secret, no knowledge of interviews or sessions. The main backend (`../backend`) is the authenticating proxy — it validates the JWT/session, forwards frames here, gets a verdict, and owns all escalation/status logic. This service just answers "how many faces / what gesture is in these frames".
+A **standalone, stateless proctoring vision service** for HireForce. It runs face/hand/pose inference over HTTP and nothing else: no database, no auth of its own beyond a shared secret, no knowledge of interviews or sessions. The main backend (`../backend`) is the authenticating proxy — it validates the JWT/session, forwards frames here, gets a verdict, and owns all escalation/status logic. This service just answers "how many faces / what gesture is in these frames".
 
 It is a **peer** to `backend/` and `frontend/`, not part of the backend — its own uv project, its own image, its own deps. It deliberately shares no code with the backend (that's why it isn't under `backend/`, unlike the taskiq worker which *is* the backend run with a different command).
 
