@@ -226,7 +226,7 @@ wheels = [
 ]
 
 [[package]]
-name = "interxai-vision"
+name = "hireforce-vision"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [

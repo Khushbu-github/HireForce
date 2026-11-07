@@ -18,8 +18,8 @@ uv run uvicorn app.main:app --reload --port 8001
 
 ## Endpoints
 
-- `GET /health` → `{ "ok": true }` once the detector has loaded
-- `POST /detect` → face count over one or more frames:
+- `GET /health` → `{ "ok": true, "ready": true, "detector": "YuNet", "version": "0.1.0" }` once the detector has loaded. If startup fails, `ok`/`ready` stay `false` and `/detect` returns 503 with the error detail.
+- `POST /detect` → face count over one or more frames (max **8** frames per request):
 
 ```bash
 curl -s localhost:8001/detect \
@@ -29,7 +29,15 @@ curl -s localhost:8001/detect \
 ```
 
 `face_count` is the **max** across the submitted frames — conservative: a second
-person in any frame trips it.
+person in any frame trips it. Unknown `checks` values return HTTP 400.
+
+## Smoke check
+
+From the repo root (with the vision server already running on port 8001):
+
+```bash
+bash tools/vision_smoke.sh
+```
 
 ## Model
 
