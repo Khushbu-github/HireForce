@@ -1,0 +1,121 @@
+services:
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    environment:
+      # Inside the compose network, services reach each other by service
+      # name, not localhost — these override whatever backend/.env carries
+      # (which is set for running the API directly on the host instead).
+      REDIS_URL: redis://redis:6379/0
+      PISTON_URL: http://piston:2000
+      VISION_URL: http://vision:8000
+      VISION_SHARED_SECRET: ${VISION_SHARED_SECRET:-}
+      # Local Postgres instead of remote Neon — much lower query latency.
+      DATABASE_URL: postgresql://interxai:interxai@postgres:5432/interxai
+      DATABASE_SSL: disable
+    volumes:
+      - ./backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      vision:
+        condition: service_started
+
+  taskiq_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.taskiq
+    env_file:
+      - ./backend/.env
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      PISTON_URL: http://piston:2000
+      VISION_URL: http://vision:8000
+      VISION_SHARED_SECRET: ${VISION_SHARED_SECRET:-}
+      DATABASE_URL: postgresql://interxai:interxai@postgres:5432/interxai
+      DATABASE_SSL: disable
+    volumes:
+      - ./backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      api:
+        condition: service_started
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: interxai
+      POSTGRES_PASSWORD: interxai
+      POSTGRES_DB: interxai
+    # Host 5433 → container 5432, so it can't clash with a Postgres already
+    # running on the host's 5432. Services reach it as postgres:5432 internally.
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U interxai -d interxai"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    # No host port publish: services reach it as redis:6379 on the compose
+    # network, and WSL runs its own redis-server on host 6379 for local dev.
+    volumes:
+      - redis_data:/data
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # Empty default value.
+        # In real deployments, this is provided via a host environment variable
+        # or a root-level .env file.
+        VITE_API_URL: ${VITE_API_URL:-}
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
+
+  piston:
+    image: ghcr.io/engineer-man/piston
+    privileged: true
+    ports:
+      - "2000:2000"
+    environment:
+      - PISTON_RUN_TIMEOUT=15000
+      - PISTON_COMPILE_TIMEOUT=15000
+    volumes:
+      - piston_data:/piston
+    restart: always
+
+  # Stateless proctoring inference (face/hand/pose). The API reaches it as
+  # http://vision:8000 on the compose network; the published port is for
+  # direct debugging only.
+  vision:
+    build:
+      context: ./vision
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8000"
+    environment:
+      VISION_SHARED_SECRET: ${VISION_SHARED_SECRET:-}
+    restart: always
+
+volumes:
+  postgres_data:
+  redis_data:
+  piston_data:
