@@ -1,0 +1,200 @@
+from typing import Any
+
+from fastapi import APIRouter, Depends, status
+from fastapi.responses import RedirectResponse
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.requests import Request
+
+from app.config import settings
+from app.database import get_db
+from app.exceptions.auth import UserNotFoundError
+from app.logger import get_logger
+from app.models.user import User, UserProfile
+from app.schemas.user import (
+    TokenResponse,
+    UserCreate,
+    UserLogin,
+    UserResponse,
+    UserUpdate,
+)
+from app.utils.authorization import get_current_user, verify_ownership
+from app.utils.bcrypt_hasher import BcryptHasher
+from app.utils.jwt_auth import JwtAuth
+from app.utils.oidc import OIDCProvider
+
+logger = get_logger(__name__)
+
+router: APIRouter = APIRouter(prefix="/users", tags=["users"])
+google_oidc_provider = OIDCProvider(provider_name="google")
+google_client = google_oidc_provider.client
+assert google_client is not None, "OIDC client initialization failed for Google provider"
+
+
+@router.post("/signup", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+async def signup(user_data: UserCreate, db: AsyncSession = Depends(get_db)) -> TokenResponse:
+    """
+    User registration endpoint.
+    """
+    logger.info("Signup request for user: %s", user_data.username)
+    auth = JwtAuth(db_session=db)
+    user = await auth.create_user(
+        username=user_data.username,
+        password=user_data.password,
+        email=user_data.email,
+    )
+    token = await auth.generate_token(user)
+    await db.refresh(user, attribute_names=["profile"])
+    logger.info("User created successfully: %s (id=%d)", user_data.username, user.id)
+    return TokenResponse(token=token, user=UserResponse.model_validate(user))
+
+
+@router.post("/login", response_model=TokenResponse)
+async def login(credentials: UserLogin, db: AsyncSession = Depends(get_db)) -> TokenResponse:
+    """Authenticate user and return access token."""
+    logger.info("Login request for user: %s", credentials.username)
+    auth = JwtAuth(db_session=db)
+    user = await auth.authenticate(
+        username=credentials.username,
+        password=credentials.password,
+    )
+    token = await auth.generate_token(user)
+    await db.refresh(user, attribute_names=["profile"])
+    logger.info("User logged in successfully: %s", credentials.username)
+    return TokenResponse(token=token, user=UserResponse.model_validate(user))
+
+
+@router.get("/me", response_model=UserResponse)
+async def get_me(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> UserResponse:
+    """Return the currently authenticated user (used to hydrate the SPA after OIDC login)."""
+    await db.refresh(current_user, attribute_names=["profile"])
+    return UserResponse.model_validate(current_user)
+
+
+@router.get("/{user_id}", response_model=UserResponse)
+async def get_user(
+    user_id: int,
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(get_current_user),
+) -> UserResponse:
+    """
+    Get user by ID endpoint.
+    """
+    logger.info("Get user request for id: %d", user_id)
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        logger.warning("User not found: %d", user_id)
+        raise UserNotFoundError(user_id=user_id)
+    logger.info("User retrieved successfully: %d", user_id)
+    await db.refresh(user, attribute_names=["profile"])
+    return UserResponse.model_validate(user)
+
+
+@router.put("/{user_id}", response_model=UserResponse)
+async def update_user(
+    user_id: int,
+    user_data: UserUpdate,
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(verify_ownership),
+) -> UserResponse:
+    """
+    Update user by ID endpoint.
+    """
+    logger.info("Update user request for id: %d", user_id)
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        logger.warning("User not found for update: %d", user_id)
+        raise UserNotFoundError(user_id=user_id)
+
+    update_data = user_data.model_dump(exclude_unset=True, exclude={"profile"})
+    if update_data:
+        hasher = BcryptHasher()
+        for field, value in update_data.items():
+            if value is not None:
+                if field == "password":
+                    value = hasher.hash(value)
+                setattr(user, field, value)
+
+    # Handle profile update
+    if user_data.profile is not None:
+        profile_result = await db.execute(select(UserProfile).where(UserProfile.user_id == user_id))
+        profile = profile_result.scalar_one_or_none()
+
+        if not profile:
+            profile = UserProfile(user_id=user_id)
+            db.add(profile)
+
+        profile_update_data = user_data.profile.model_dump(exclude_unset=True)
+        for field, value in profile_update_data.items():
+            if value is not None and hasattr(profile, field):
+                setattr(profile, field, value)
+
+    await db.commit()
+    await db.refresh(user)
+    await db.refresh(user, attribute_names=["profile"])
+    logger.info("User updated successfully: %d", user_id)
+    return UserResponse.model_validate(user)
+
+
+@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_user(
+    user_id: int,
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(verify_ownership),
+) -> None:
+    """
+    Delete user by ID endpoint.
+    """
+    logger.info("Delete user request for id: %d", user_id)
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        logger.warning("User not found for delete: %d", user_id)
+        raise UserNotFoundError(user_id=user_id)
+
+    await db.delete(user)
+    await db.commit()
+    logger.info("User deleted successfully: %d", user_id)
+
+
+@router.get("/login/google")
+async def login_google(request: Request) -> Any:
+
+    redirect_uri = request.url_for("auth_callback")
+    logger.info("Initiating Google OIDC login, redirect URI: %s", redirect_uri)
+    return await google_client.authorize_redirect(request, redirect_uri)
+
+
+@router.get("/auth/google/callback")
+async def auth_callback(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> RedirectResponse:
+    # This is a top-level browser navigation (Google -> us -> SPA), so on success
+    # or failure we redirect back to the frontend rather than returning JSON. The
+    # token rides in the URL fragment so it never reaches the server logs/Referer.
+    try:
+        token = await google_client.authorize_access_token(request)
+    except Exception:
+        logger.exception("Google OIDC callback failed")
+        return RedirectResponse(
+            f"{settings.FRONTEND_URL}/#oidc_error=oauth_failed", status_code=302
+        )
+
+    user_info = token.get("userinfo")
+    if not user_info or not user_info.get("email"):
+        logger.warning("Google OIDC callback returned no usable userinfo")
+        return RedirectResponse(f"{settings.FRONTEND_URL}/#oidc_error=no_userinfo", status_code=302)
+
+    auth = JwtAuth(db_session=db)
+    user = await auth.get_or_create_oidc_user(
+        email=user_info["email"],
+        name=user_info.get("name", ""),
+    )
+    jwt_token = await auth.generate_token(user)
+    return RedirectResponse(f"{settings.FRONTEND_URL}/#oidc_token={jwt_token}", status_code=302)

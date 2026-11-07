@@ -1,0 +1,166 @@
+from fastapi import APIRouter, Depends, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from app.database import get_db
+from app.exceptions.common import ForbiddenError, NotFoundError
+from app.logger import get_logger
+from app.models.organization import Organization
+from app.models.user import User
+from app.schemas.organization import (
+    McpTokenResponse,
+    OrganizationCreate,
+    OrganizationResponse,
+    OrganizationSignupResponse,
+    OrganizationUpdate,
+)
+from app.utils.authorization import get_current_user, verify_org_ownership
+from app.utils.jwt_auth import JwtAuth
+
+logger = get_logger(__name__)
+
+router: APIRouter = APIRouter(prefix="/organizations", tags=["organizations"])
+
+
+def _org_response(org: Organization, name: str | None) -> OrganizationResponse:
+    resp = OrganizationResponse.model_validate(org)
+    resp.name = name
+    return resp
+
+
+@router.post(
+    "/signup",
+    response_model=OrganizationSignupResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def signup_organization(
+    data: OrganizationCreate,
+    db: AsyncSession = Depends(get_db),
+) -> OrganizationSignupResponse:
+    """
+    Organization signup endpoint.
+    """
+    logger.info("Organization signup request for: %s", data.username)
+
+    auth = JwtAuth(db_session=db)
+
+    user = await auth.create_organization(
+        username=data.username,
+        password=data.password,
+        email=data.email,
+    )
+
+    token = await auth.generate_token(user)
+
+    logger.info(
+        "Organization created successfully: %s (id=%d)",
+        data.username,
+        user.id,
+    )
+
+    return OrganizationSignupResponse(
+        organization=_org_response(user.organization, user.username),
+        access_token=token,
+    )
+
+
+@router.get("/me", response_model=OrganizationResponse)
+async def get_my_organization(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> OrganizationResponse:
+    """The caller's own organization profile, resolved from the auth token."""
+    result = await db.execute(
+        select(Organization).where(Organization.account_id == current_user.id)
+    )
+    org = result.scalar_one_or_none()
+    if not org:
+        raise NotFoundError("Organization not found")
+    return _org_response(org, current_user.username)
+
+
+@router.post("/mcp-token", response_model=McpTokenResponse)
+async def create_mcp_token(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> McpTokenResponse:
+    """Mint a bearer token this organization can configure in an MCP client.
+
+    It is a standard organization access token (the same kind issued at login),
+    reused as the MCP server's bearer credential. Only organization accounts may
+    mint one.
+    """
+    if not current_user.is_organization:
+        raise ForbiddenError("Only organizations can generate MCP tokens")
+    token = await JwtAuth(db_session=db).generate_token(current_user)
+    logger.info("Minted MCP token for org account %d", current_user.id)
+    return McpTokenResponse(token=token)
+
+
+@router.get("/{org_id}", response_model=OrganizationResponse)
+async def get_organization(
+    org_id: int,
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(get_current_user),
+) -> OrganizationResponse:
+    """
+    Get organization by organization ID endpoint.
+    """
+    logger.info("Get organization request for org id: %d", org_id)
+
+    result = await db.execute(
+        select(Organization)
+        .options(selectinload(Organization.owner))
+        .where(Organization.id == org_id)
+    )
+    org = result.scalar_one_or_none()
+
+    if not org:
+        logger.warning("Organization not found: %d", org_id)
+        raise NotFoundError("Organization not found")
+
+    logger.info("Organization retrieved successfully: %d", org_id)
+    return _org_response(org, org.owner.username if org.owner else None)
+
+
+@router.put("/{org_id}", response_model=OrganizationResponse)
+async def update_organization(
+    org_id: int,
+    org_data: OrganizationUpdate,
+    db: AsyncSession = Depends(get_db),
+    org: Organization = Depends(verify_org_ownership),
+    current_user: User = Depends(get_current_user),
+) -> OrganizationResponse:
+    """
+    Update organization by organization ID endpoint.
+    """
+    logger.info("Update organization request for org id: %d", org_id)
+
+    update_data = org_data.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        if value is not None and hasattr(org, field):
+            setattr(org, field, value)
+
+    await db.commit()
+    await db.refresh(org)
+
+    logger.info("Organization updated successfully: %d", org_id)
+    return _org_response(org, current_user.username)
+
+
+@router.delete("/{org_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_organization(
+    org_id: int,
+    db: AsyncSession = Depends(get_db),
+    org: Organization = Depends(verify_org_ownership),
+) -> None:
+    """
+    Delete organization by organization ID endpoint.
+    """
+    logger.info("Delete organization request for org id: %d", org_id)
+
+    await db.delete(org)
+    await db.commit()
+
+    logger.info("Organization deleted successfully: %d", org_id)
