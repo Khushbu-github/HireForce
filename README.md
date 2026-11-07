@@ -25,11 +25,11 @@ Organizations create fully customized interviews with domain-specific questions 
 
 
 
-## Demo and Presentation
+## 🎬 Demo and Presentation
 
-- **Project folder (Google Drive):** [Open folder](https://drive.google.com/drive/folders/1s7ZhA3R9ECZxvEg41pydYM6JRitKPcKJ)
-- **Demo video (10 min):** [Watch on YouTube](https://youtu.be/FNbC3wWPRrE)
-- **Presentation (slides):** [View slides](https://canva.link/ld1j2vncuatws2c)
+| Video Walkthrough | Links & Deliverables |
+| :---: | :--- |
+| <a href="https://youtu.be/FNbC3wWPRrE" target="_blank" title="Click to watch on YouTube"><img src="https://img.youtube.com/vi/FNbC3wWPRrE/maxresdefault.jpg" width="320" alt="HireForce Demo Video" /></a><br/><sub><a href="https://youtu.be/FNbC3wWPRrE">▶ Click to watch on YouTube (10 min)</a></sub> | <img src="https://cdn.simpleicons.org/youtube/FF0000" width="18" height="18" align="center" /> &nbsp; **YouTube:**<br/>[Watch Demo Video (10 min)](https://youtu.be/FNbC3wWPRrE)<br/><br/><img src="https://cdn.simpleicons.org/canva/00C4CC" width="18" height="18" align="center" /> &nbsp; **Canva:**<br/>[View Presentation Slides](https://canva.link/ld1j2vncuatws2c)<br/><br/><img src="https://cdn.simpleicons.org/googledrive/4285F4" width="18" height="18" align="center" /> &nbsp; **Google Drive:**<br/>[Open Project Folder](https://drive.google.com/drive/folders/1s7ZhA3R9ECZxvEg41pydYM6JRitKPcKJ) |
 
 
 ## Features
