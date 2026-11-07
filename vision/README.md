@@ -1,8 +1,12 @@
-# InterXAI Vision Service
+# HireForce Vision Service
 
 Stateless proctoring vision service — face inference over HTTP. Called by the main
 backend (which validates the session and owns all escalation logic); this service
 just answers "how many faces are in these frames".
+
+The HireForce backend talks to this service via `VISION_URL` (default
+`http://localhost:8001`) and optional `VISION_SHARED_SECRET` /
+`X-Vision-Secret`.
 
 ## Run locally
 
