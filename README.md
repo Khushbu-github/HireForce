@@ -24,6 +24,14 @@ HireForce is an AI-powered interview automation platform designed to make techni
 Organizations create fully customized interviews with domain-specific questions and DSA challenges. Candidates apply by submitting their resumes, which are automatically evaluated and scored by an LLM agent against the job requirements - all without manual intervention. To ensure interview integrity, every session is proctored by a two-tier webcam face-detection pipeline: a lightweight in-browser model gives the candidate instant feedback, while a standalone [vision service](#proctoring--the-vision-service) running a stronger detector (OpenCV YuNet) holds the authoritative verdict — backed by a heartbeat liveness check and stored evidence frames.
 
 
+
+## Demo and Presentation
+
+- **Project folder (Google Drive):** [Open folder](https://drive.google.com/drive/folders/1s7ZhA3R9ECZxvEg41pydYM6JRitKPcKJ)
+- **Demo video (10 min):** [Watch on YouTube](https://youtu.be/FNbC3wWPRrE)
+- **Presentation (slides):** [View slides](https://canva.link/ld1j2vncuatws2c)
+
+
 ## Features
 
 ### For Organizations
